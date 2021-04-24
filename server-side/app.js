@@ -35,8 +35,8 @@ app.use(function (err, req, res, next) {
   res.render('error');
 });
 
-app.listen(process.env.PORT || config.PORT, () => {
-  console.log(`Backend APIs is running at http://localhost:${config.PORT}`)
+app.listen(port = process.env.PORT || config.PORT, () => {
+  console.log(`Backend APIs is running at http://localhost:${port}`)
 })
 
 module.exports = app;
