@@ -42,7 +42,6 @@ class P2Pserver {
   }
 
   connectToPeers() {
-    console.log(1, 1, peers);
 
     //connect to each available peer
     peers.forEach(peer => { // mình chủ động đi connect với ngta

@@ -8,7 +8,7 @@ const lookupTable = {
 module.exports = {
   getCurrentTimestamp: _ => Date.now(),
 
-  calculateHash: (index, prevHash, timestamp, data, nonce) => CryptoJS.SHA256(index + prevHash + timestamp + JSON.stringify(data) + nonce).toString(),
+  calculateHash: (index, prevHash, timestamp, data, difficulty, nonce) => CryptoJS.SHA256(index + prevHash + timestamp + JSON.stringify(data) + difficulty + nonce).toString(),
 
   hexToBinary: (hashInHex) => {
     let result = '';
@@ -23,62 +23,3 @@ module.exports = {
     return result;
   }
 }
-
-// const getCurrentTimestamp = () => Date.now();
-
-// const calculateHash = (index, prevHash, timestamp, data, nonce) => CryptoJS.SHA256(index + prevHash + timestamp + JSON.stringify(data) + nonce).toString();
-
-// const isValidChain = (blockchainToValid) => {
-
-//   // if (JSON.stringify(blockchainToValid[0]) !== JSON.stringify(Block.generateFirstBlock())) {
-//   //   return false;
-//   // }
-
-//   for (let i = 1; i < blockchainToValid.length; i++) {
-//     const currentBlock = blockchainToValid[i];
-//     const previousBlock = blockchainToValid[i - 1];
-
-//     if (module.exports.isValidBlock(currentBlock, previousBlock) === false) {
-//       return false;
-//     }
-//   }
-
-//   return true;
-// };
-
-// const isValidBlock = (currentBlock, previousBlock) => {
-
-//   // console.log(1);
-//   if (module.exports.isValidBlockStructure(currentBlock) === false) {
-//     return false;
-//   }
-//   // console.log(2);
-//   if (currentBlock.hash !== module.exports.calculateHash(currentBlock.index, currentBlock.previousHash, currentBlock.timestamp, currentBlock.transactions, 0)) {
-//     return false;
-//   }
-//   // console.log(3);
-//   if (currentBlock.previousHash !== previousBlock.hash) {
-//     return false;
-//   }
-
-//   return true;
-// };
-
-// const isValidBlockStructure = (block) => (typeof block.index === 'number' && typeof block.hash === 'string' && typeof block.previousHash === 'string' && typeof block.timestamp === 'number' && typeof block.transactions === 'string');
-
-// const hexToBinary = (hashInHex) => {
-//   let result = '';
-
-//   for (let i = 0; i < hashInHex.length; i = i + 1) {
-//     if (lookupTable[hashInHex[i]]) {
-//       result += lookupTable[hashInHex[i]];
-//     } else {
-//       return null;
-//     }
-//   }
-//   return result;
-// }
-
-// module.exports = {
-//   getCurrentTimestamp, calculateHash, hexToBinary, isValidBlock, isValidBlockStructure, isValidChain
-// }
