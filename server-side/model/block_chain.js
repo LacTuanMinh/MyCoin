@@ -4,12 +4,12 @@ class Blockchain {
 
   // private blockchain: Block[];
   constructor() {
-    this.blockchain = [Block.generateFirstBlock()];
+    this.blockchain = [Block.generateGenesisBlock()];
   }
 
   static isValidChain = (blockchainToValid) => {
 
-    if (JSON.stringify(blockchainToValid[0]) !== JSON.stringify(Block.generateFirstBlock())) {
+    if (JSON.stringify(blockchainToValid[0]) !== JSON.stringify(Block.generateGenesisBlock())) {
       return false;
     }
 
@@ -26,7 +26,24 @@ class Blockchain {
   }
 
   addNewBlock = (data) => {
-    const newBlock = Block.generateNextBlock(this.getLastBlock(), data);
+    const newBlock = Block.generateRawNextBlock(this.getLastBlock(), data);
+    this.blockchain.push(newBlock);
+    return newBlock;
+  }
+
+  generateNextBlockWithTx = (unspentTxOutputs, wallet, receiverAddress, amount) => {
+    if (typeof receiverAddress !== 'string') {
+      throw Error('invalid address', receiverAddress);
+    }
+    if (typeof amount !== 'number') {
+      throw Error('invalid amount');
+    }
+
+    const coinbaseTx = wallet.getCoinbaseTx(this.getLastBlock().index + 1);
+    const transaction = wallet.createTx(amount, receiverAddress, unspentTxOutputs);
+    const blockData = [coinbaseTx, transaction];
+
+    const newBlock = Block.generateRawNextBlock(this.getLastBlock(), blockData);
     this.blockchain.push(newBlock);
     return newBlock;
   }
@@ -56,6 +73,8 @@ class Blockchain {
     this.blockchain = newChain;
     return true;
   }
+
+
 }
 
 module.exports = { Blockchain }

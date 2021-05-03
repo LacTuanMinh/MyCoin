@@ -1,4 +1,4 @@
-const { genUUID, keyFromPrivate, verifySignature } = require("../../utils/helper");
+const { verifySignature, keyPairFromPrivateKey, publicKeyFromPrivateKey } = require("../../utils/helper");
 const CryptoJS = require('crypto-js');
 const { MINING_REWARD } = require("../../logic.config");
 
@@ -14,6 +14,10 @@ class UnspentTxOutput {
     this.address = address;
     this.amount = amount;
   }
+
+  static findUnspentTxOutput = (transactionId, index, unspentTxOutputs /* : UnspentTxOutput[] */) =>
+    unspentTxOutputs.find((uTxO) => uTxO.txOutputId === transactionId && uTxO.txOutputIndex === index) /*: UnspentTxOutput */;
+
 }
 
 class TxOutput {
@@ -28,7 +32,6 @@ class TxOutput {
       console.log('invalid address type');
       return false;
     }
-
 
     //////chưa check address format
 
@@ -50,9 +53,6 @@ class TxInput {
   getAmountFromReferredUnspentTxOutput = (unspentTxOutputs) => (unspentTxOutputs.find(uTxO => uTxO.txOutputId === this.txOutputId && uTxO.txOutputIndex === this.txOutputIndex)).amount
 
   isValidTxInputStructure = () => {
-    // if (txInput === null) {
-    //   return false;
-    // }
 
     if (typeof this.signature !== 'string') {
       console.log('tx input is missing');
@@ -92,6 +92,29 @@ class TxInput {
 
     return true;
   }
+
+  getSignature(transaction, unspentTxOutputs, privateKey) {
+    // const txInput = transaction.txInputs[txInputIndex];
+    const dataToSign = transaction.id; //only the txId will be signed
+    const referencedUnspentTxOutput /*: UnspentTxOutput */
+      = UnspentTxOutput.findUnspentTxOutput(this.txOutputId, this.txOutputIndex, unspentTxOutputs);
+
+    if (referencedUnspentTxOutput === null) {
+      console.log('refered tx output not found');
+      throw Error('refered tx output not found');
+    }
+
+    const referedAddress = referencedUnspentTxOutput.address;
+
+    if (referedAddress !== publicKeyFromPrivateKey(privateKey)) {
+      console.log('refering an unspent tx output not belong to this private key');
+      throw Error('refering an unspent tx output not belong to this private key');
+    }
+
+    const key = keyPairFromPrivateKey(privateKey);
+    const signature = key.sign(dataToSign); //toHexString(key.sign(dataToSign).toDER());
+    return signature;
+  }
 }
 
 class Transaction {
@@ -106,19 +129,6 @@ class Transaction {
     return CryptoJS.SHA256(txInputContent + txOutputContent);
   }
 
-  // may be convert to none static
-  static getSignature(transaction, txInputIndex, unspentTxOutputs /*: UnspentTxOutput[] */, privateKey) {
-    const txInput = transaction.txInputs[txInputIndex];
-    const dataToSign = transaction.id; //only the txId will be signed
-    // const referencedUnspentTxOutput /*: UnspentTxOutput */ = findUnspentTxOutput(txInput.txOutputId, txInput.txOutputIndex, unspentTxOutputs);
-    // const referencedAddress = referencedUnspentTxOutput.address;
-    const key = keyFromPrivate(privateKey);
-    const signature = toHexString(key.sign(dataToSign).toDER());
-    return signature;
-  }
-
-  static findUnspentTxOutput = (transactionId, index, unspentTxOutputs /* : UnspentTxOutput[] */) =>
-    unspentTxOutputs.find((uTxO) => uTxO.txOutputId === transactionId && uTxO.txOutputIndex === index) /*: UnspentTxOutput */;
 
   static updateUnspentTxOutputs = (transactions, currentUnspentTxOutputs)/* : UnspentTxOutput[]*/ => {
 
@@ -139,10 +149,10 @@ class Transaction {
     return resultingUnspentTxOuts;
   }
 
-  isValidTx = (unspentTxOutputs) => {
+  isValidNormalTx = (unspentTxOutputs) => {
     console.log('normal tx ', this.id);
 
-    if (this.isValidTransactionStructure() === false) {
+    if (this.isValidNormalTxStructure() === false) {
       return false;
     }
 
@@ -163,6 +173,32 @@ class Transaction {
       return false;
     }
 
+    return true;
+  }
+
+  isValidNormalTxStructure = () => {
+
+    if (typeof this.id !== 'string') {// undefined
+      console.log('Missing tx id');
+      return false;
+    }
+
+    if (!(this.txInputs instanceof Array)) {
+      console.log('transaction input must be instance of array');
+      return false;
+    }
+    if (this.txInputs.map(txInput => txInput.isValidTxInputStructure()).includes(false)) {
+      return false;
+    }
+
+    if (!(this.txOutputs instanceof Array)) {
+      console.log('transaction output must be instance of array');
+      return false;
+    }
+
+    if (this.txOutputs.map(txOutput => txOutput.isValidTxOutputStructure()).includes(false)) {
+      return false;
+    }
     return true;
   }
 
@@ -196,32 +232,7 @@ class Transaction {
     return true;
   }
 
-  isValidTransactionStructure = () => {
-
-    if (typeof this.id !== 'string') {// undefined
-      console.log('Missing tx id');
-      return false;
-    }
-
-    if (!(this.txInputs instanceof Array)) {
-      console.log('transaction input must be instance of array');
-      return false;
-    }
-    if (this.txInputs.map(txInput => txInput.isValidTxInputStructure()).includes(false)) {
-      return false;
-    }
-
-    if (!(this.txOutputs instanceof Array)) {
-      console.log('transaction output must be instance of array');
-      return false;
-    }
-
-    if (this.txOutputs.map(txOutput => txOutput.isValidTxOutputStructure()).includes(false)) {
-      return false;
-    }
-    return true;
-  }
 
 }
 
-module.exports = { Transaction };
+module.exports = { Transaction, TxOutput, TxInput, UnspentTxOutput };

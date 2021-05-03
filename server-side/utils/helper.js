@@ -8,11 +8,13 @@ module.exports = {
 
   calculateHash: (index, prevHash, timestamp, data, difficulty, nonce) => CryptoJS.SHA256(index + prevHash + timestamp + JSON.stringify(data) + difficulty + nonce).toString(),
 
-  genKeyPair: () => ec.gekenKeyPair(),
+  genKeyPair: () => ec.genKeyPair(),
 
-  keyFromPrivate: (privateKey) => ec.keyFromPrivate(privateKey, 'hex'),
+  keyPairFromPrivateKey: (privateKey) => ec.keyFromPrivate(privateKey, 'hex'),
+
+  publicKeyFromPrivateKey: (privateKey) => ec.keyFromPrivate(privateKey, 'hex').getPublic().encode('hex'),
 
   genUUID: () => uuidV1(),
 
-  verifySignature: (publicKey, signature, dataHash) => ec.keyFromPublic(publicKey, 'hex').verify(dataHash, signature),
+  verifySignature: (publicKey, signature, dataHash) => ec.keyFromPublic(publicKey, 'hex').verify(dataHash, signature), ///keyFromPublic(publicKey, 'hex').verify(dataHash, signature),
 }
