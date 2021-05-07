@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "start": "nodemon app",
+    "start": "nodemon test",
     "dev": "nodemon app"
   },
   "dependencies": {

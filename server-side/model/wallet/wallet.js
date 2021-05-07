@@ -1,7 +1,7 @@
 const { genKeyPair, publicKeyFromPrivateKey } = require("../../utils/helper");
 const fs = require('fs');
 const { TxInput, TxOutput, Transaction } = require("./transaction");
-const { MINING_REWARD } = require("../../logic.config");
+const { MINING_REWARD } = require("../../logic_config");
 const location = 'key_storage/private_key';
 
 class Wallet {
@@ -25,18 +25,64 @@ class Wallet {
 
   findEnoughUnspentTxOutPuts = (amount, myUnspentTxOutputs) => {
     let sum = 0;
-    const chosenTxOutputs = [];
+    const chosenUnspentTxOutputs = [];
 
-    for (const uTxO in myUnspentTxOutputs) {
+    for (const uTxO of myUnspentTxOutputs) {
       sum += uTxO.amount;
-      chosenTxOutputs.push(uTxO);
+      chosenUnspentTxOutputs.push(uTxO);
       if (sum >= amount) {
-        return { chosenTxOutputs, change: sum - amount };
+        return { chosenUnspentTxOutputs, change: sum - amount };
       }
     };
 
     console.log('Not enough coin');
     throw Error('Not enough coin');
+  }
+
+  filterTxPoolTxs = (unspentTxOutputs, transactionPool)/*: UnspentTxOut[]*/ => {
+
+    const arrayOfTxInputsInPool /*:TxInput[]*/ = JSON.parse(JSON.stringify(transactionPool.map(tx => tx.txInputs)));
+    const txInputsInPool = [];
+    arrayOfTxInputsInPool.forEach(txInputs => txInputs.forEach(txInput => txInputsInPool.push(txInput)));
+
+    const removable /*: UnspentTxOut[]*/ = [];
+    for (const unspentTxOutput of unspentTxOutputs) {
+      // const txIn = _.find(txIns, (aTxIn: TxIn) => {
+      //   return aTxIn.txOutIndex === unspentTxOutput.txOutIndex && aTxIn.txOutId === unspentTxOutput.txOutId;
+      // });
+
+      const txInput = txInputsInPool.find(input => input.txOutputIndex === unspentTxOutput.txOutputIndex && input.txOutputId === unspentTxOutput.txOutputId);
+
+      console.log('filter: ', txInput);
+
+      if (txInput !== undefined) {
+        removable.push(unspentTxOutput);
+      }
+    }
+
+    return unspentTxOutputs.filter(uTxO => !removable.includes(uTxO)); // _.without(unspentTxOutputs, ...removable);
+  };
+
+  createTx = (amount, receiverAddress, unspentTxOutputs, txPool /** :Transaction[] */) => {
+
+    console.log('tx pool: ', txPool);
+    const myUnspentTxOutputs = this.findMyUnspentTxOutputs(unspentTxOutputs);
+    const myUnspentTxOutputsNotReferedInPool = this.filterTxPoolTxs(myUnspentTxOutputs, txPool);
+    const { chosenUnspentTxOutputs, change } = this.findEnoughUnspentTxOutPuts(amount, myUnspentTxOutputsNotReferedInPool);
+    const unsignedTxInputs = chosenUnspentTxOutputs.map(uTxO => this.createTxInput(uTxO)); // : TxInput[]
+    const myAddress = this.getPublicKeyFromPrivateKey();
+    const txOutputs = this.createTxOutputs(receiverAddress, amount, myAddress, change);
+
+    const transaction = new Transaction();
+    transaction.txInputs = unsignedTxInputs;
+    transaction.txOutputs = txOutputs;
+    transaction.id = transaction.getTxId();
+
+    transaction.txInputs.forEach(input => {
+      input.signature = input.getSignature(transaction, unspentTxOutputs, this.privateKey);
+    });
+
+    return transaction;
   }
 
   createTxInput = (unspentTxOutput) => {
@@ -56,27 +102,6 @@ class Wallet {
     }
 
     return txOutputs;
-  }
-
-  createTx = (amount, receiverAddress, unspentTxOutputs) => {
-
-    const myAddress = this.getPublicKeyFromPrivateKey();
-    const myUnspentTxOutputs = this.findMyUnspentTxOutputs(unspentTxOutputs);
-    const { chosenTxOutputs, change } = this.findEnoughUnspentTxOutPuts(amount, myUnspentTxOutputs);
-
-    const unsignedTxInputs = chosenTxOutputs.map(output => this.createTxInput(output)); // : TxInput[]
-    const txOutputs = this.createTxOutputs(receiverAddress, amount, myAddress, change);
-
-    const transaction = new Transaction();
-    transaction.txInputs = unsignedTxInputs;
-    transaction.txOutputs = txOutputs;
-    transaction.id = transaction.getTxId();
-
-    transaction.txInputs.forEach(input => {
-      input.signature = input.getSignature(transaction, unspentTxOutputs, this.privateKey);
-    });
-
-    return transaction;
   }
 
   getCoinbaseTx = (blockIndex) => {
@@ -100,4 +125,4 @@ class Wallet {
   // }
 }
 
-module.exports = { Wallet }
+module.exports = Wallet

@@ -1,6 +1,6 @@
 const { verifySignature, keyPairFromPrivateKey, publicKeyFromPrivateKey } = require("../../utils/helper");
 const CryptoJS = require('crypto-js');
-const { MINING_REWARD } = require("../../logic.config");
+const { MINING_REWARD } = require("../../logic_config");
 
 class UnspentTxOutput {
   txOutputId;
@@ -18,6 +18,24 @@ class UnspentTxOutput {
   static findUnspentTxOutput = (transactionId, index, unspentTxOutputs /* : UnspentTxOutput[] */) =>
     unspentTxOutputs.find((uTxO) => uTxO.txOutputId === transactionId && uTxO.txOutputIndex === index) /*: UnspentTxOutput */;
 
+  static updateUnspentTxOutputs = (newTransactions, currentUnspentTxOutputs)/* : UnspentTxOutput[]*/ => {
+
+    // retrieve all new unspent transaction outputs from the new block:
+    const newUnspentTxOutputs = newTransactions.map((transaction) => {
+      return transaction.txOutputs.map((txOutput, index) => new UnspentTxOutput(transaction.id, index, txOutput.address, txOutput.amount));
+    }).reduce((a, b) => a.concat(b), []); // : UnspentTxOutput[]
+
+    const consumedTxOuts = newTransactions
+      .map((t) => t.txIns)
+      .reduce((a, b) => a.concat(b), [])
+      .map((txIn) => new UnspentTxOut(txIn.txOutId, txIn.txOutIndex, '', 0)); // ignore address and amount in this case because we just want to create the 'mock' consumed txOutputs (instead of searching all in the current blockchain)
+
+    const resultingUnspentTxOuts = currentUnspentTxOutputs
+      .filter(((uTxO) => !UnspentTxOutput.findUnspentTxOutput(uTxO.txOutId, uTxO.txOutIndex, consumedTxOuts))) // filter the unspentTxOutputs hasnt been consumed
+      .concat(newUnspentTxOutputs); // join with the new ones
+
+    return resultingUnspentTxOuts;
+  }
 }
 
 class TxOutput {
@@ -77,7 +95,7 @@ class TxInput {
     console.log(transaction.id, this.txOutputId, this.txOutputIndex, this.signature);
 
     const referencedUnspentTxOutput =
-      unspentTxOutputs.find((uTxO) => uTxO.txOutputId === this.txOutputId && uTxO.txOutputIndex === txIn.txOutputIndex);
+      unspentTxOutputs.find((uTxO) => uTxO.txOutputId === this.txOutputId && uTxO.txOutputIndex === this.txOutputIndex);
 
     if (referencedUnspentTxOutput === null) {
       console.log('transaction input not refered any unspent tx output');
@@ -115,6 +133,13 @@ class TxInput {
     const signature = key.sign(dataToSign); //toHexString(key.sign(dataToSign).toDER());
     return signature;
   }
+
+  static hasDuplicateTxInput = (txInputs) => {
+
+    console.log(txInputs);
+    const values = txInputs.map(input => input.txOutputId + input.txOutputIndex);
+    return values.some((value, index) => values.indexOf(value) !== index);
+  }
 }
 
 class Transaction {
@@ -123,30 +148,59 @@ class Transaction {
   txInputs;// TxIn[];
   txOutputs;// TxOut[];
 
+  static generateGeneisTx = () => {
+    const txInput = new TxInput();
+    txInput.signature = '';
+    txInput.txOutputId = '';
+    txInput.txOutputIndex = 0;
+
+    const txOutput = new TxOutput('0', 0);
+    const tx = new Transaction();
+    tx.txInputs = [txInput];
+    tx.txOutputs = [txOutput];
+    tx.id = tx.getTxId();
+    return tx;
+  }
+
   getTxId() {
     const txInputContent = this.txInputs.map(txInput => txInput.txOutputId + txInput.txOutputIndex).reduce((a, b) => a + b, '');
     const txOutputContent = this.txOutputs.map(txOutput => txOutput.address + txOutput.amount).reduce((a, b) => a + b, '');
-    return CryptoJS.SHA256(txInputContent + txOutputContent);
+    return CryptoJS.SHA256(txInputContent + txOutputContent).toString();
   }
 
+  /**
+   * 
+   * Từ các transactions dc truyền vào, lọc ra các unspentTxOutputs chưa dc dùng thực sự
+   */
+  static processTransactions = (transactions, unspentTxOutputs, blockIndex) => {
 
-  static updateUnspentTxOutputs = (transactions, currentUnspentTxOutputs)/* : UnspentTxOutput[]*/ => {
+    if (Transaction.isValidBlockTransactions(transactions, unspentTxOutputs, blockIndex) === false) {
+      console.log('invalid tx in block ', blockIndex);
+      return null;
+    }
 
-    // retrieve all new unspent transaction outputs from the new block (transactions):
-    const newUnspentTxOutputs = transactions.map((transaction) => {
-      return transaction.txOutputs.map((txOutput, index) => new UnspentTxOutput(transaction.id, index, txOutput.address, txOutput.amount));
-    }).reduce((a, b) => a.concat(b), []); // : UnspentTxOutput[]
+    // thêm uTxO mới vào, xóa uTxO đã dc sử dụng khỏi ds, trả về 1 list các unspentTxOutputs
+    return UnspentTxOutput.updateUnspentTxOutputs(transactions, unspentTxOutputs);
+  }
 
-    const consumedTxOuts = transactions
-      .map((t) => t.txIns)
-      .reduce((a, b) => a.concat(b), [])
-      .map((txIn) => new UnspentTxOut(txIn.txOutId, txIn.txOutIndex, '', 0)); // ignore address and amount in this case because we just want to create the 'mock' consumed txOutputs (instead of searching all in the current blockchain)
+  static isValidBlockTransactions = (transactions, unspentTxOutputs, blockIndex) => {
+    const coinbaseTx = transactions[0];
 
-    const resultingUnspentTxOuts = currentUnspentTxOutputs
-      .filter(((uTxO) => !findUnspentTxOut(uTxO.txOutId, uTxO.txOutIndex, consumedTxOuts))) // filter the unspentTxOutputs hasnt been consumed
-      .concat(newUnspentTxOutputs); // join with the new ones
+    if (coinbaseTx.isValidCoinbaseTx(blockIndex) === false) {
+      console.log('invalid coinbase tx', blockIndex, coinbaseTx);
+      return false;
+    }
 
-    return resultingUnspentTxOuts;
+    const arrOfTxInputs = transactions.map(tx => tx.txInputs);
+    const allTxInputs = [];
+    arrOfTxInputs.forEach(txInputs => txInputs.forEach(txInput => allTxInputs.push(txInput)));
+
+    if (TxInput.hasDuplicateTxInput(allTxInputs)) {
+      return false;
+    }
+
+    const normalTxs = transactions.slice(1);
+    return normalTxs.map(tx => tx.isValidNormalTx(unspentTxOutputs)).includes(false) === false;
   }
 
   isValidNormalTx = (unspentTxOutputs) => {
@@ -232,6 +286,30 @@ class Transaction {
     return true;
   }
 
+  static parseTxFromRawObject = (rawObject) => {
+    const txs = [];
+
+    for (const rawTx of rawObject) {
+      const inputs = [];
+      const outputs = [];
+
+      for (const input of rawTx.txInputs) {
+        inputs.push(Object.assign(new TxInput(), input));
+      }
+
+      for (const output of rawTx.txOutputs) {
+        outputs.push(Object.assign(new TxOutput(), output));
+      }
+
+      const tx = new Transaction();
+      tx.id = rawTx.id;
+      tx.txInputs = inputs;
+      tx.txOutputs = outputs;
+      txs.push(tx);
+    }
+
+    return txs;
+  }
 
 }
 

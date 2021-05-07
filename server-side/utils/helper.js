@@ -1,7 +1,7 @@
 const CryptoJS = require('crypto-js');
 const EC = require('elliptic').ec;
 const ec = new EC('secp256k1');
-const uuidV1 = require('uuid/v1');
+const uuidV1 = require('uuid').v1;
 
 module.exports = {
   getCurrentTimestamp: _ => Date.now(),

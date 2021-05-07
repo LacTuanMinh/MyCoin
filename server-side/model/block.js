@@ -1,5 +1,6 @@
 const { calculateHash, getCurrentTimestamp } = require('../utils/helper');
-const { DIFFICULTY, MINE_RATE } = require('../logic.config');
+const { DIFFICULTY, MINE_RATE } = require('../logic_config');
+const { Transaction } = require('./wallet/transaction');
 class Block {
   // public index: number;
   // public timestamp: number;
@@ -17,10 +18,11 @@ class Block {
     this.hash = hash;
   }
 
-  static generateGenesisBlock() { return new Block(0, 0, 'Hello, world!', '0', DIFFICULTY, 0, '123546879'); }
+  static generateGenesisBlock() {
+    return new Block(0, 0, [Transaction.generateGeneisTx()], '0', DIFFICULTY, 0, '123546879');
+  }
 
-  //////////////////////
-  static generateRawNextBlock = (lastBlock, data) => { // to mine block
+  static generateRawNextBlock = (lastBlock, data) => { // to mine block by proof of work
     const nextIndex = lastBlock.index + 1;
     let nextTimestamp;
     const nextData = JSON.stringify(data);
@@ -29,6 +31,7 @@ class Block {
     let nonce = -1;
     let hash;
 
+    // here is the proof of work
     do {
       nonce++;
       nextTimestamp = getCurrentTimestamp();
@@ -39,26 +42,11 @@ class Block {
     return new Block(nextIndex, nextTimestamp, nextData, previousHash, difficulty, nonce, hash);
   }
 
-  // static generateNextBlockWithTx = (lastBlock, unspentTxOutputs, wallet, receiverAddress, amount) => {
-  //   if (typeof receiverAddress !== 'string') {
-  //     throw Error('invalid address', receiverAddress);
-  //   }
-  //   if (typeof amount !== 'number') {
-  //     throw Error('invalid amount');
-  //   }
-
-  //   const coinbaseTx = wallet.getCoinbaseTx(lastBlock.index + 1);
-  //   const transaction = wallet.createTx(amount, receiverAddress, unspentTxOutputs);
-  //   const blockData = [coinbaseTx, transaction];
-
-  //   return Block.generateRawNextBlock(lastBlock, blockData);
-  // }
-
-  ////////////
   static isValidBlock = (currentBlock, previousBlock) => {
 
     // console.log(1);
     if (Block.isValidBlockStructure(currentBlock) === false) {
+      console.log('invalid block structure');
       return false;
     }
     // console.log(2);
@@ -77,12 +65,10 @@ class Block {
     return true;
   }
 
-  ////////////
   static isValidBlockStructure = (block) => (typeof block.index === 'number' && typeof block.timestamp === 'number' && typeof block.transactions === 'string' &&
     typeof block.previousHash === 'string' && typeof block.difficulty === 'number' && typeof block.nonce === 'number' && typeof block.hash === 'string'
   );
 
-  ////////////////////////////////
   /**
    * return a new adjusted difficulty, have to continuously call this function each time we generate a new hash. Since the timestamp will also change when we generate a new hash
    * @param {*} lastBlock 
@@ -94,8 +80,18 @@ class Block {
     return difficulty;
   }
 
+  static parseBlockFromRawObject = (rawObject) => {
+    const blocks = [];
 
+    for (const rawBlock of rawObject) {
+      const transactions = Transaction.parseTxFromRawObject(rawBlock.transactions);
+      const aBlock = Object.assign(new Block(), rawBlock);
+      aBlock.transactions = transactions;
+      blocks.push(aBlock);
 
+    }
+    return blocks;
+  }
 }
 
-module.exports = { Block };
+module.exports = Block;
