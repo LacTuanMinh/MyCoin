@@ -1,3 +1,52 @@
+const MyClass = require('./test2');
+
+const array1 = [];
+module.exports = { array1 }
+
+
+const a = new MyClass();
+
+a.pushAndPrint();
+
+console.log(array1);
+
+const name = 'minh';
+
+module.exports = { name }
+a.pushAndPrint();
+console.log(array1);
+
+return;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // class TxInput {
 //   constructor(outputId, outputIndex, sig) { this.outputId = outputId; this.outputIndex = outputIndex; this.sig = sig; }
 

@@ -18,14 +18,19 @@ class Block {
     this.hash = hash;
   }
 
-  static generateGenesisBlock() {
-    return new Block(0, 0, [Transaction.generateGeneisTx()], '0', DIFFICULTY, 0, '123546879');
+  static generateGenesisBlock = () => {
+    const index = 0;
+    const timestamp = 0;
+    const transactions = [Transaction.generateGeneisTx()];
+    const previousHash = '';
+    const nonce = 0;
+    return new Block(index, timestamp, transactions, previousHash, 0, nonce, calculateHash(index, previousHash, timestamp, transactions, DIFFICULTY, nonce));
   }
 
   static generateRawNextBlock = (lastBlock, data) => { // to mine block by proof of work
     const nextIndex = lastBlock.index + 1;
     let nextTimestamp;
-    const nextData = JSON.stringify(data);
+    const nextData = data;
     const previousHash = lastBlock.hash;
     let difficulty = lastBlock.difficulty;
     let nonce = -1;
@@ -36,7 +41,7 @@ class Block {
       nonce++;
       nextTimestamp = getCurrentTimestamp();
       difficulty = Block.getAdjustDifficulty(lastBlock, nextTimestamp);
-      hash = calculateHash(nextIndex, nextTimestamp, nextData, previousHash, difficulty, nonce)
+      hash = calculateHash(nextIndex, previousHash, nextTimestamp, nextData, difficulty, nonce)
     } while (hash.substring(0, difficulty) !== '0'.repeat(difficulty));
 
     return new Block(nextIndex, nextTimestamp, nextData, previousHash, difficulty, nonce, hash);
@@ -49,25 +54,34 @@ class Block {
       console.log('invalid block structure');
       return false;
     }
-    // console.log(2);
-    // if (currentBlock.hash !== calculateHash(currentBlock.index, currentBlock.previousHash, currentBlock.timestamp, currentBlock.transactions, 0)) {
-    //   return false;
-    // }
-    if (currentBlock.hash !== calculateHash(previousBlock.index + 1, previousBlock.hash, currentBlock.timestamp, currentBlock.transactions, 0)) {
+    console.log(previousBlock);
+    console.log(currentBlock);
+    console.log(calculateHash(previousBlock.index + 1, previousBlock.hash, currentBlock.timestamp, currentBlock.transactions, 0));
+    if (currentBlock.hash !==
+      calculateHash(previousBlock.index + 1, previousBlock.hash, currentBlock.timestamp, currentBlock.transactions, currentBlock.difficulty, currentBlock.nonce)) {
+      console.log('invalid hash');
       return false;
     }
 
     // console.log(3);
     if (currentBlock.previousHash !== previousBlock.hash) {
+      console.log('invlaid prev hash');
       return false;
     }
 
+    console.log('valid block');
     return true;
   }
 
-  static isValidBlockStructure = (block) => (typeof block.index === 'number' && typeof block.timestamp === 'number' && typeof block.transactions === 'string' &&
-    typeof block.previousHash === 'string' && typeof block.difficulty === 'number' && typeof block.nonce === 'number' && typeof block.hash === 'string'
-  );
+  static isValidBlockStructure = (block) => {
+    // console.log(69, block.transactions.map(tx => tx.isValidNormalTxStructure()).reduce((a, b) => (a && b), true));
+    return (
+      typeof block.index === 'number' &&
+      typeof block.timestamp === 'number' &&  //&&
+      typeof block.previousHash === 'string' && typeof block.difficulty === 'number' &&
+      typeof block.nonce === 'number' && typeof block.hash === 'string'
+    )
+  };
 
   /**
    * return a new adjusted difficulty, have to continuously call this function each time we generate a new hash. Since the timestamp will also change when we generate a new hash

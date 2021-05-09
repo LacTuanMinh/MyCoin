@@ -1,8 +1,8 @@
 const WebSocket = require('ws');
 const config = require('../application_properties.json');
 const Block = require('../model/block');
-const { Transaction, TxInput, TxOutput } = require('../model/wallet/transaction');
-const { unspentTxOutputs, txPool } = require('../routes');
+const Blockchain = require('../model/block_chain');
+const { Transaction } = require('../model/wallet/transaction');
 const p2p_port = process.env.P2P_PORT || config.P2P_PORT;
 const peers = process.env.PEERS ? process.env.PEERS.split(',') : []; // PEERS = ws://localhost:5002 P2P_PORT=5001 HTTP_PORT=3001 npm run dev
 
@@ -17,7 +17,11 @@ const MessageType = {
 class P2Pserver {
 
   constructor(blockchain) {
+    const { unspentTxOutputs, txPool } = require('../routes');
+
     this.blockchain = blockchain;  // new Blockchain()
+    this.txPool = txPool;
+    this.unspentTxOutputs = unspentTxOutputs;
     this.sockets = [];
   }
 
@@ -98,10 +102,10 @@ class P2Pserver {
           // handle received transaction
           for (const tx of receivedTxs) {
             try {
-              txPool.addToTxPool(tx, unspentTxOutputs);
+              this.txPool.addToTxPool(tx, this.unspentTxOutputs);
               this.broadcastSendTxPool();
             } catch (err) {
-              console.log(err.message);
+              // console.log(err);
               //probably already have it in our pool
             }
           }
@@ -113,7 +117,7 @@ class P2Pserver {
           this.sendLastBlock(socket);
           break;
         case MessageType.QUERY_TRANSACTION_POOL:
-          this.sendTxPool();
+          this.sendTxPool(socket);
           break;
       }
     });
@@ -148,13 +152,13 @@ class P2Pserver {
   sendTxPool(socket) {
     socket.send(JSON.stringify({
       type: MessageType.RESPONSE_TRANSACTION_POOL,
-      data: JSON.stringify(txPool.txsInPool)
+      data: JSON.stringify(this.txPool.txsInPool)
     }));
   }
 
   /**
    * sync the chain whenever a new block is added to the blockchain
-   * 119
+   * 173
    */
   broadcastSyncChain() {
     this.sockets.forEach(socket => {
@@ -192,13 +196,13 @@ class P2Pserver {
       return;
     }
 
-    const localLastBlock = this.blockchain.blockchain.getLastBlock();
+    const localLastBlock = this.blockchain.getLastBlock();
 
     if (receivedLastBlock.index > localLastBlock.index) {
       console.log('need to update local blockchain', 'local index:' + localLastBlock.index, 'peer index: ' + receivedLastBlock.index);
 
       if (localLastBlock.hash === receivedLastBlock.previousHash) {  // lệch nhau 1 block
-
+        console.log('lệch nhau 1 block');
         if (this.blockchain.addBlockToChain(receivedLastBlock)) { // return true mean add successfully AND unspentTxOutputs was updated
           this.broadcastSyncChain(); // lại broadcast cho peer khác
         }

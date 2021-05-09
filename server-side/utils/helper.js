@@ -17,4 +17,8 @@ module.exports = {
   genUUID: () => uuidV1(),
 
   verifySignature: (publicKey, signature, dataHash) => ec.keyFromPublic(publicKey, 'hex').verify(dataHash, signature), ///keyFromPublic(publicKey, 'hex').verify(dataHash, signature),
+
+  byteArrayToHexString: (byteArray) => Array.from(byteArray, (byte) => {
+    return ('0' + (byte & 0xFF).toString(16)).slice(-2);
+  }).join(''),
 }

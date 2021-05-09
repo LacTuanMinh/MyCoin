@@ -1,16 +1,10 @@
 const express = require('express');
+const Block = require('../model/block');
 const Blockchain = require('../model/block_chain');
 const router = express.Router();
-// const Blockchain = require('../model/block_chain');
 const TxPool = require('../model/wallet/transaction_pool');
 const Wallet = require('../model/wallet/wallet');
 const P2Pserver = require('../utils/p2p_server');
-
-/**
- * Create new blockchain instance
- */
-const meCoin = new Blockchain();
-const unspentTxOutputs = []; // : UnspentTxOutput[]
 
 /**
  * Create transaction pool
@@ -18,9 +12,24 @@ const unspentTxOutputs = []; // : UnspentTxOutput[]
 const txPool = new TxPool();
 
 /**
+ * Create new blockchain instance
+ */
+const unspentTxOutputs = []; // : UnspentTxOutput[]
+
+const setUnspentTxOutputs = (newUnspentTxOutputs) => {
+  unspentTxOutputs.length = 0;
+  unspentTxOutputs.push(...newUnspentTxOutputs);
+}
+
+module.exports = { txPool, setUnspentTxOutputs, unspentTxOutputs }
+
+const meCoin = new Blockchain();
+
+/**
  * Create instance of P2P server
  */
 const p2pserver = new P2Pserver(meCoin);
+
 /**
  * Create the wallet
  */
@@ -35,23 +44,81 @@ router.get('/', function (req, res, next) {
 
 router.get('/blocks', (req, res) => {
   console.log(meCoin.blockchain);
-  res.send({ blockchain: meCoin.blockchain });
+  return res.send({ blockchain: meCoin.blockchain });
+});
+
+router.get('/blocks/:hash', (req, res) => {
+  return res.send({
+    block: meCoin.findBlock(req.params.hash)
+  });
+});
+
+router.get('/transactions/:id', (req, res) => {
+  return res.send({
+    transaction: meCoin.findBlock(req.params.hash)
+  });
+});
+
+// show information about a specific address
+router.get('/address/:address', (req, res) => {
+  const _unspentTxOutputs = unspentTxOutputs.find(uTxO => uTxO.address === req.params.address);
+  return res.send({ unspentTxOutputs: _unspentTxOutputs });
 });
 
 router.get('/myUnspentTxOutputs', (req, res) => {
-  res.send({ unspentTxOutputs: wallet.findMyUnspentTxOutputs(unspentTxOutputs) });
+  return res.send({ unspentTxOutputs: wallet.findMyUnspentTxOutputs(unspentTxOutputs) });
 });
 
-// router.post('/mineRawBlock')
-///////////?????????????
-// router.post('/mineBlock', (req, res) => {
 
-//   const data = req.body.data;
-//   const newBlock = meCoin.addNewBlock(data);
-//   p2pserver.syncChain(meCoin);
-//   res.redirect('/blocks');
-// });
+//front-end của Dapps gửi tx tới~   CÓ KHẢ NĂNG LOGIC SẼ CODE LẠI NHƯ sendTransaction
+router.post('/mineRawBlock', (req, res) => {
 
+  const data = req.body.data;// transaction or transaction[]
+
+  try {
+    if (data === null) {
+      throw Error('missing transactions');
+    }
+
+    const newBlock = Block.generateRawNextBlock(meCoin.getLastBlock(), data);
+
+    if (meCoin.addBlockToChain(newBlock)) {
+      p2pserver.broadcastSyncChain(); // broadcast latest block to other peers
+      return res.status(201).send({ newBlock });
+    }
+
+    throw Error('data not valid');
+
+  } catch (err) {
+    console.log(err.message);
+    return res.status(400).send({ msg: err.message });
+  }
+});
+
+
+// lấy tx trong pool ra
+router.post('/mineBlock', (req, res) => {
+
+  const newBlock = meCoin.generateNextBlock(wallet, txPool.txsInPool);
+
+  if (meCoin.addBlockToChain(newBlock)) {
+
+    p2pserver.broadcastSyncChain();
+    return res.status(201).send({ newBlock });
+  }
+
+  return res.status(400).send({ msg: 'data not valid' });
+});
+
+router.get('/balance', (req, res) => {
+  return res.send({ balance: wallet.getBalance() });
+});
+
+router.get('/address', (req, res) => {
+  return res.send({ address: wallet.getPublicKeyFromPrivateKey() });
+});
+
+// [coinbase, tx]
 router.post('/mineTransaction', (req, res) => {
 
   const { address, amount } = req.body;
@@ -61,18 +128,18 @@ router.post('/mineTransaction', (req, res) => {
     if (address === undefined || amount === undefined) {
       throw Error('invalid address or amount');
     }
-
-    // [coinbase, tx]
-    const newBlock = meCoin.generateNextBlockWithTx(unspentTxOutputs, wallet, address, amount, txPool.txsInPool);
-
+    const newBlock = meCoin.generateNextBlockWithTx(
+      unspentTxOutputs, wallet, address, amount, txPool.txsInPool
+    );
     if (meCoin.addBlockToChain(newBlock)) {
       p2pserver.broadcastSyncChain(); // broadcast latest block to other peers
-      res.send(newBlock);
+      return res.status(201).send({ newBlock });
     }
 
+    throw Error('data not valid');
   } catch (err) {
-    console.log(err.message);
-    res.status(400).send({ msg: e.message });
+    console.log(err);
+    return res.status(400).send({ msg: err.message });
   }
 });
 
@@ -95,8 +162,8 @@ router.post('/sendTransaction', (req, res) => {
     res.status(200).send({ newTransaction: tx });
 
   } catch (err) {
-    console.log(err.message);
-    res.status(400).send({ msg: e.message });
+    console.log(157, err.message);
+    res.status(400).send({ msg: err.message });
   }
 
 });
@@ -120,4 +187,4 @@ router.post('/stopServer', (req, res) => {
 
 p2pserver.listen();
 
-module.exports = { router, txPool, unspentTxOutputs };
+module.exports = { router };

@@ -10,7 +10,7 @@ class TxPool {
     }
 
     if (this.isValidTxForPool(unconfirmedTx) === false) {
-      throw Error('txIn already been in the txPool');
+      throw Error();
     }
 
     this.txsInPool.push(unconfirmedTx);

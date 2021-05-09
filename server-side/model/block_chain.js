@@ -1,12 +1,17 @@
-const { unspentTxOutputs, txPool } = require("../routes");
 const Block = require("./block");
 const { Transaction } = require("./wallet/transaction");
 
 class Blockchain {
 
-  // private blockchain: Block[];
+  // blockchain: Block[];
   constructor() {
+    const { unspentTxOutputs, txPool, setUnspentTxOutputs } = require('../routes');
+    this.setUnspentTxOutputs = setUnspentTxOutputs;
+    this.txPool = txPool;
     this.blockchain = [Block.generateGenesisBlock()];
+
+    this.setUnspentTxOutputs(Transaction.processTransactions(this.blockchain[0].transactions, unspentTxOutputs, 0));
+    this.unspentTxOutputs = unspentTxOutputs;
   }
 
   static isValidChain = (blockchainToValid) => {
@@ -36,26 +41,41 @@ class Blockchain {
     return { validChain: true, newUnspentTxOutputs: _unspentTxOutputs };
   }
 
+  findBlock = (hash) => this.blockchain.find(block => block.hash === hash);
+
+  findTx = (id) => {
+
+    for (const block of this.blockchain) {
+      for (const tx of block.transactions) {
+        if (tx.id === id) {
+          return tx;
+        }
+      }
+    }
+  }
+
   /**
    * 
    * where the unspentTxOutputs of this node was updated
    */
   addBlockToChain = (newBlock) => {
+    const { setUnspentTxOutputs } = require('../routes');
 
     if (Block.isValidBlock(newBlock, this.getLastBlock())) {
-      const retVal /** :UnspentTxOutput[] */ = Transaction.processTransactions(newBlock.transactions, unspentTxOutputs, newBlock.index);
+      const retVal /** :UnspentTxOutput[] */ = Transaction.processTransactions(newBlock.transactions, this.unspentTxOutputs, newBlock.index);
 
       if (retVal === null) {
         console.log('block is not valid in terms of transactions');
         return false;
       }
 
+      console.log('block info is valid');
       this.blockchain.push(newBlock);
-      unspentTxOutputs = retVal;
-      txPool.updateTxPool(unspentTxOutputs);
+      this.setUnspentTxOutputs(retVal);
+      this.txPool.updateTxPool(this.unspentTxOutputs);
       return true;
     }
-
+    console.log('Block info is not valid');
     return false;
   }
 
@@ -96,19 +116,12 @@ class Blockchain {
    */
   replaceChain = (newChain) => {
 
+    const { setUnspentTxOutputs } = require('../routes').setUnspentTxOutputs;
+
     if (newChain.length <= this.blockchain.length) {
       console.log('No need to replace chain');
       return false;
     }
-
-    // if (Blockchain.isValidChain(newChain) === false) {
-    //   console.log('Received chain is invalid');
-    //   return false;
-    // }
-
-    // console.log("Replacing the current chain with new chain");
-    // this.blockchain = newChain;
-    // return true;
 
     const { validChain, newUnspentTxOutputs } = Blockchain.isValidChain(newChain);
     if (validChain === false) {
@@ -118,8 +131,8 @@ class Blockchain {
 
     console.log("Replacing the current chain with new chain");
     this.blockchain = newChain;
-    unspentTxOutputs = newUnspentTxOutputs;
-    txPool.updateTxPool(newUnspentTxOutputs);
+    setUnspentTxOutputs(newUnspentTxOutputs);
+    this.txPool.updateTxPool(newUnspentTxOutputs);
     return true;
   }
 }
