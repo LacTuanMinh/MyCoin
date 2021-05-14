@@ -1,25 +1,50 @@
-const { genKeyPair, publicKeyFromPrivateKey } = require("../../utils/helper");
+const { genKeyPair, publicKeyFromPrivateKey, keyPairFromPrivateKey } = require("../../utils/helper");
 const fs = require('fs');
+const CryptoJS = require('crypto-js');
 const { TxInput, TxOutput, Transaction } = require("./transaction");
 const { MINING_REWARD } = require("../../logic_config");
 const location = process.env.KEY_LOCATION;
+const password = process.env.PASSWORD;
 
 class Wallet {
   constructor() {
+
     if (fs.existsSync(location)) {
-      this.privateKey = fs.readFileSync(location, 'utf-8');
-      console.log(publicKeyFromPrivateKey(this.privateKey));
+      console.log('exist key');
+      const content = fs.readFileSync(location, 'utf-8');
+      const decryptedContent = CryptoJS.AES.decrypt(content, password).toString(CryptoJS.enc.Utf8);
+      const _password = decryptedContent.substring(decryptedContent.indexOf('/') + 1);
+
+      if (password !== _password) {
+        throw Error('password not correct');
+      }
+
+      const privateKey = decryptedContent.substring(0, decryptedContent.indexOf('/'));
+      const keyPair = keyPairFromPrivateKey(privateKey);
+      const publicKey = keyPair.getPublic().encode('hex');
+
+      console.log(privateKey, publicKey);
+      if (!Transaction.isValidAddress(publicKey)) {
+        throw Error('Keystore file is not valid in term of private key');
+      }
+
+      this.privateKey = privateKey;
       console.log(this.privateKey);
       return;
     }
-    this.privateKey = genKeyPair().getPrivate().toString();
-    fs.writeFileSync(location, this.privateKey);
+
+    const keyPair = genKeyPair();
+    console.log(keyPair.getPublic().encode('hex'));
+    const encryptedPrivKey = CryptoJS.AES.encrypt(keyPair.getPrivate().toString(16) + '/' + password, password).toString();
+
+    fs.writeFileSync(location, encryptedPrivKey);
+    this.privateKey = keyPair.getPrivate().toString(16);
     console.log(this.privateKey);
   }
 
   getPublicKeyFromPrivateKey = () => publicKeyFromPrivateKey(this.privateKey);
 
-  getBalance = (unspentTxOutputs) => this.findMyUnspentTxOutputs(unspentTxOutputs).map(uTxO => uTxO.amount).sum();
+  getBalance = (unspentTxOutputs) => this.findMyUnspentTxOutputs(unspentTxOutputs).map(uTxO => uTxO.amount).reduce((a, b) => a + b, 0);
 
   findMyUnspentTxOutputs = (unspentTxOutputs) => {
     const address = this.getPublicKeyFromPrivateKey(); // address = public key
@@ -40,7 +65,7 @@ class Wallet {
     };
 
     console.log('Not enough coin');
-    throw Error('Not enough coin');
+    throw Error('You have not enough coin or your coin is waiting in pool for previous transaction');
   }
 
   // lọc ra unspent tx outputs đang dc refer bởi txs trong pool
@@ -83,6 +108,8 @@ class Wallet {
     const transaction = new Transaction();
     transaction.txInputs = unsignedTxInputs;
     transaction.txOutputs = txOutputs;
+    transaction.sender = myAddress;
+    transaction.receiver = receiverAddress;
     transaction.id = transaction.getTxId();
 
     transaction.txInputs.forEach(input => {
@@ -112,16 +139,19 @@ class Wallet {
   }
 
   getCoinbaseTx = (blockIndex) => {
+    const myAddress = this.getPublicKeyFromPrivateKey();
     const transaction = new Transaction();
     const txInput = new TxInput();
     txInput.signature = ''; // no need in coinbase tx because it does not spend from a UTXO
     txInput.txOutputIndex = blockIndex;
     txInput.txOutputId = ''; // no need
 
-    const txOutput = new TxOutput(this.getPublicKeyFromPrivateKey(), MINING_REWARD);
+    const txOutput = new TxOutput(myAddress, MINING_REWARD);
 
     transaction.txInputs = [txInput];
     transaction.txOutputs = [txOutput];
+    transaction.sender = '';
+    transaction.receiver = myAddress;
     transaction.id = transaction.getTxId();
 
     return transaction;
@@ -131,5 +161,15 @@ class Wallet {
   //   return `Wallet - publicKey: ${this.publicKey.toString()}, balance: ${this.balance}`;
   // }
 }
+const getBalance = (address, unspentTxOutputs) => {
+  if (Transaction.isValidAddress(address) === false) {
+    throw Error('invalid address');
+  }
+  return findUnspentTxOutputs(address, unspentTxOutputs).map(uTxO => uTxO.amount).reduce((a, b) => a + b, 0)
+};
 
-module.exports = Wallet
+const findUnspentTxOutputs = (address, unspentTxOutputs) => {
+  return unspentTxOutputs.filter(uTxO => uTxO.address === address);
+}
+
+module.exports = { Wallet, getBalance, findUnspentTxOutputs }

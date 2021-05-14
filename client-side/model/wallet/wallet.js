@@ -126,10 +126,6 @@ class Wallet {
 
     return transaction;
   }
-
-  // toString() {
-  //   return `Wallet - publicKey: ${this.publicKey.toString()}, balance: ${this.balance}`;
-  // }
 }
 
 module.exports = Wallet

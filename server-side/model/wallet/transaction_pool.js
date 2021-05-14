@@ -1,5 +1,11 @@
+const { Transaction } = require("./transaction");
+const fs = require('fs');
+
 class TxPool {
-  txsInPool = []; // :Transaction[]
+
+  constructor() {
+    this.txsInPool = readPoolFromLocalStorage(); // :Transaction[]
+  }
 
   getTxPool = () => this.txsInPool;
 
@@ -14,6 +20,8 @@ class TxPool {
     }
 
     this.txsInPool.push(unconfirmedTx);
+    savePoolToLocalStorage(this.txsInPool);
+
   }
 
   updateTxPool = (unspentTxOutputs) => {
@@ -35,6 +43,7 @@ class TxPool {
     if (invalidTxs.length > 0) {
       console.log('removing these tx from pool : ', invalidTxs);
       this.txsInPool = this.txsInPool.filter(tx => !invalidTxs.includes(tx));
+      savePoolToLocalStorage(this.txsInPool);
     }
   }
 
@@ -58,9 +67,27 @@ class TxPool {
       }
     }
     return true;
-
-
   }
 }
 
-module.exports = TxPool;
+const location = 'data_storage/pool.txt';
+
+const readPoolFromLocalStorage = () => {
+
+  if (fs.existsSync(location)) {
+    const rawData = fs.readFileSync(location, 'utf-8');
+    const rawTxs = JSON.parse(rawData);
+    const txs = Transaction.parseTxFromRawObject(rawTxs);
+    return txs;
+  } else {
+    const txs = [];
+    fs.writeFileSync(location, JSON.stringify(txs));
+    return txs;
+  }
+}
+
+const savePoolToLocalStorage = (txs) => {
+  fs.writeFileSync(location, JSON.stringify(txs));
+}
+
+module.exports = { TxPool };

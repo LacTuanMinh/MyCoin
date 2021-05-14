@@ -1,5 +1,5 @@
 const { calculateHash, getCurrentTimestamp } = require('../utils/helper');
-const { DIFFICULTY, MINE_RATE } = require('../logic_config');
+const { DIFFICULTY, MINE_RATE, DIFFICULTY_ADJUSTMENT_INTERVAL, BLOCK_GENERATION_INTERVAL } = require('../logic_config');
 const { Transaction } = require('./wallet/transaction');
 class Block {
   // public index: number;
@@ -24,15 +24,16 @@ class Block {
     const transactions = [Transaction.generateGeneisTx()];
     const previousHash = '';
     const nonce = 0;
-    return new Block(index, timestamp, transactions, previousHash, 0, nonce, calculateHash(index, previousHash, timestamp, transactions, DIFFICULTY, nonce));
+    return new Block(index, timestamp, transactions, previousHash, DIFFICULTY, nonce, calculateHash(index, previousHash, timestamp, transactions, DIFFICULTY, nonce));
   }
 
-  static generateRawNextBlock = (lastBlock, data) => { // to mine block by proof of work
+  static generateRawNextBlock = (blocks, data) => { // to mine block by proof of work
+    const lastBlock = blocks[blocks.length - 1];
     const nextIndex = lastBlock.index + 1;
     let nextTimestamp;
     const nextData = data;
     const previousHash = lastBlock.hash;
-    let difficulty = lastBlock.difficulty;
+    let difficulty = Block.getDifficulty(blocks);
     let nonce = -1;
     let hash;
 
@@ -40,7 +41,7 @@ class Block {
     do {
       nonce++;
       nextTimestamp = getCurrentTimestamp();
-      difficulty = Block.getAdjustDifficulty(lastBlock, nextTimestamp);
+      difficulty = DIFFICULTY //Block.getAdjustDifficulty(lastBlock, nextTimestamp);
       hash = calculateHash(nextIndex, previousHash, nextTimestamp, nextData, difficulty, nonce)
     } while (hash.substring(0, difficulty) !== '0'.repeat(difficulty));
 
@@ -49,6 +50,10 @@ class Block {
 
   static isValidBlock = (currentBlock, previousBlock) => {
 
+    if (currentBlock === null) {
+      console.log('block is null');
+      return false;
+    }
     // console.log(1);
     if (Block.isValidBlockStructure(currentBlock) === false) {
       console.log('invalid block structure');
@@ -56,7 +61,7 @@ class Block {
     }
     console.log(previousBlock);
     console.log(currentBlock);
-    console.log(calculateHash(previousBlock.index + 1, previousBlock.hash, currentBlock.timestamp, currentBlock.transactions, 0));
+    // console.log(calculateHash(previousBlock.index + 1, previousBlock.hash, currentBlock.timestamp, currentBlock.transactions, 0));
     if (currentBlock.hash !==
       calculateHash(previousBlock.index + 1, previousBlock.hash, currentBlock.timestamp, currentBlock.transactions, currentBlock.difficulty, currentBlock.nonce)) {
       console.log('invalid hash');
@@ -85,14 +90,30 @@ class Block {
 
   /**
    * return a new adjusted difficulty, have to continuously call this function each time we generate a new hash. Since the timestamp will also change when we generate a new hash
-   * @param {*} lastBlock 
-   * @param {*} currentTime 
+   * @param {*} latestBlock 
+   * @param {*} aBlockchain 
    */
-  static getAdjustDifficulty(lastBlock, currentTime) {
-    let difficulty = lastBlock.difficulty;
-    difficulty = lastBlock.timestamp + MINE_RATE > currentTime ? difficulty + 1 : difficulty - 1;
-    return difficulty;
+  static getAdjustedDifficulty(latestBlock, aBlockchain) {
+    const prevAdjustmentBlock = aBlockchain[aBlockchain.length - DIFFICULTY_ADJUSTMENT_INTERVAL];
+    const timeExpected = BLOCK_GENERATION_INTERVAL * DIFFICULTY_ADJUSTMENT_INTERVAL;
+    const timeTaken = latestBlock.timestamp - prevAdjustmentBlock.timestamp;
+    if (timeTaken < timeExpected / 2) {
+      return prevAdjustmentBlock.difficulty + 1;
+    } else if (timeTaken > timeExpected * 2) {
+      return prevAdjustmentBlock.difficulty > 0 ? prevAdjustmentBlock.difficulty - 1 : 0;
+    } else {
+      return prevAdjustmentBlock.difficulty;
+    }
   }
+
+  static getDifficulty = (aBlockchain) => {
+    const latestBlock = aBlockchain[aBlockchain.length - 1];
+    if (latestBlock.index % DIFFICULTY_ADJUSTMENT_INTERVAL === 0 && latestBlock.index !== 0) {
+      return Block.getAdjustedDifficulty(latestBlock, aBlockchain);
+    } else {
+      return latestBlock.difficulty;
+    }
+  };
 
   static parseBlockFromRawObject = (rawObject) => {
     const blocks = [];

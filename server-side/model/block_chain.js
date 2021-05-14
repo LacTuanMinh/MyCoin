@@ -1,5 +1,6 @@
 const Block = require("./block");
 const { Transaction } = require("./wallet/transaction");
+const fs = require('fs');
 
 class Blockchain {
 
@@ -8,9 +9,21 @@ class Blockchain {
     const { unspentTxOutputs, txPool, setUnspentTxOutputs } = require('../routes');
     this.setUnspentTxOutputs = setUnspentTxOutputs;
     this.txPool = txPool;
-    this.blockchain = [Block.generateGenesisBlock()];
 
-    this.setUnspentTxOutputs(Transaction.processTransactions(this.blockchain[0].transactions, unspentTxOutputs, 0));
+    // đọc file lên
+    this.blockchain = [].concat(readBlocksFromLocalStorage());
+    // console.log(this.blockchain);
+
+    // const txs = [];
+    // this.blockchain.forEach(block => {
+    //   block.transactions.forEach(tx => txs.push(tx));
+    // })
+    // console.log(22, unspentTxOutputs);
+
+    if (this.blockchain.length === 1) {
+      setUnspentTxOutputs(Transaction.processTransactions(this.blockchain[0].transactions, unspentTxOutputs, 0));
+    }
+
     this.unspentTxOutputs = unspentTxOutputs;
   }
 
@@ -41,14 +54,14 @@ class Blockchain {
     return { validChain: true, newUnspentTxOutputs: _unspentTxOutputs };
   }
 
-  findBlock = (hash) => this.blockchain.find(block => block.hash === hash);
+  findBlock = (index) => this.blockchain.find(block => block.index === index);
 
   findTx = (id) => {
 
     for (const block of this.blockchain) {
       for (const tx of block.transactions) {
         if (tx.id === id) {
-          return tx;
+          return { tx, index: block.index };
         }
       }
     }
@@ -59,7 +72,7 @@ class Blockchain {
    * where the unspentTxOutputs of this node was updated
    */
   addBlockToChain = (newBlock) => {
-    const { setUnspentTxOutputs } = require('../routes');
+    // const { setUnspentTxOutputs } = require('../routes');
 
     if (Block.isValidBlock(newBlock, this.getLastBlock())) {
       const retVal /** :UnspentTxOutput[] */ = Transaction.processTransactions(newBlock.transactions, this.unspentTxOutputs, newBlock.index);
@@ -73,6 +86,7 @@ class Blockchain {
       this.blockchain.push(newBlock);
       this.setUnspentTxOutputs(retVal);
       this.txPool.updateTxPool(this.unspentTxOutputs);
+      saveBlocksToLocalStorage(this.blockchain);
       return true;
     }
     console.log('Block info is not valid');
@@ -83,16 +97,21 @@ class Blockchain {
   //         from the local transaction pool to a block mined by the same node.
   generateNextBlock = (wallet, txPool /** :Transaction[] */) => {
 
+    if (txPool.length === 0) {
+      return null;
+    }
     const lastBlock = this.getLastBlock();
     const coinbaseTx = wallet.getCoinbaseTx(lastBlock.index + 1);
-
-    const newBlock = Block.generateRawNextBlock(lastBlock, [coinbaseTx, ...txPool]);
+    const newBlock = Block.generateRawNextBlock(this.getBlockchain(), [coinbaseTx, ...txPool]);
     return newBlock;
   }
 
   generateNextBlockWithTx = (unspentTxOutputs, wallet, receiverAddress, amount, txPool) => {
     if (typeof receiverAddress !== 'string') {
-      throw Error('invalid address', receiverAddress);
+      throw Error('invalid address type', receiverAddress);
+    }
+    if (Transaction.isValidAddress(receiverAddress) === false) {
+      throw Error('invalid address struct', receiverAddress);
     }
     if (typeof amount !== 'number') {
       throw Error('invalid amount');
@@ -101,7 +120,7 @@ class Blockchain {
     const coinbaseTx = wallet.getCoinbaseTx(this.getLastBlock().index + 1);
     const transaction = wallet.createTx(amount, receiverAddress, unspentTxOutputs, txPool);
     const blockData = [coinbaseTx, transaction];
-    const newBlock = Block.generateRawNextBlock(this.getLastBlock(), blockData);
+    const newBlock = Block.generateRawNextBlock(this.getBlockchain(), blockData);
     return newBlock;
   }
 
@@ -133,8 +152,28 @@ class Blockchain {
     this.blockchain = newChain;
     setUnspentTxOutputs(newUnspentTxOutputs);
     this.txPool.updateTxPool(newUnspentTxOutputs);
+    saveBlocksToLocalStorage(newChain);
     return true;
   }
+}
+const location = 'data_storage/blocks.txt';
+
+const readBlocksFromLocalStorage = () => {
+
+  if (fs.existsSync(location)) {
+    const rawData = fs.readFileSync(location, 'utf-8');
+    const rawBlocks = JSON.parse(rawData);
+    const blocks = Block.parseBlockFromRawObject(rawBlocks);
+    return blocks;
+  } else {
+    const blocks = [Block.generateGenesisBlock()];
+    fs.writeFileSync(location, JSON.stringify(blocks));
+    return blocks;
+  }
+}
+
+const saveBlocksToLocalStorage = (blockchain) => {
+  fs.writeFileSync(location, JSON.stringify(blockchain));
 }
 
 module.exports = Blockchain;

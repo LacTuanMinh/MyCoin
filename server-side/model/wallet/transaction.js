@@ -36,6 +36,16 @@ class UnspentTxOutput {
 
     return resultingUnspentTxOuts;
   }
+
+  static parseUTxOFromRawObject = (rawObject) => {
+    const unspentTxOutputs = [];
+
+    for (const rawUTxO of rawObject) {
+      const uTxO = Object.assign(new UnspentTxOutput(), rawUTxO);
+      unspentTxOutputs.push(uTxO);
+    }
+    return unspentTxOutputs;
+  }
 }
 
 class TxOutput {
@@ -97,7 +107,7 @@ class TxInput {
     const referencedUnspentTxOutput =
       unspentTxOutputs.find((uTxO) => uTxO.txOutputId === this.txOutputId && uTxO.txOutputIndex === this.txOutputIndex);
 
-    if (referencedUnspentTxOutput === null) {
+    if (referencedUnspentTxOutput === undefined) {
       console.log('transaction input not refered any unspent tx output');
       return false;
     }
@@ -147,6 +157,8 @@ class Transaction {
   id;
   txInputs;// TxIn[];
   txOutputs;// TxOut[];
+  sender;
+  receiver;
 
   static generateGeneisTx = () => {
     const txInput = new TxInput();
@@ -154,10 +166,12 @@ class Transaction {
     txInput.txOutputId = '';
     txInput.txOutputIndex = 0;
 
-    const txOutput = new TxOutput('04108e1af03aba53149dc2082b91efea44e3507a6a244a2b47239f4903c9d5f9d4369e9f05a2a856a12136a047cc1845f6da770e8516c07e007b2f0e57193c7cf0', MINING_REWARD);
+    const txOutput = new TxOutput('04bbea97da0ba5a91b3afb6bc42fd11a0ca353219ef77683b2758b858766875abf099f2a86ef4a3c77f09be06b2ab6776a5b98c63e829235c4bb3c1812938969ce', MINING_REWARD);
     const tx = new Transaction();
     tx.txInputs = [txInput];
     tx.txOutputs = [txOutput];
+    tx.sender = '';
+    tx.receiver = '04bbea97da0ba5a91b3afb6bc42fd11a0ca353219ef77683b2758b858766875abf099f2a86ef4a3c77f09be06b2ab6776a5b98c63e829235c4bb3c1812938969ce'
     tx.id = tx.getTxId();
     return tx;
   }
@@ -165,7 +179,7 @@ class Transaction {
   getTxId() {
     const txInputContent = this.txInputs.map(txInput => txInput.txOutputId + txInput.txOutputIndex).reduce((a, b) => a + b, '');
     const txOutputContent = this.txOutputs.map(txOutput => txOutput.address + txOutput.amount).reduce((a, b) => a + b, '');
-    return CryptoJS.SHA256(txInputContent + txOutputContent).toString();
+    return CryptoJS.SHA256(this.sender + this.receiver + txInputContent + txOutputContent).toString();
   }
 
   /**
@@ -224,7 +238,14 @@ class Transaction {
     const totalTxOutputValue = this.txOutputs.map(output => output.amount).reduce((a, b) => (a + b), 0);
 
     if (totalTxInputValue !== totalTxOutputValue) {
-      console.log('tx output not match to tx input ammount');
+      console.log('tx output amount not match to tx input ammount');
+      return false;
+    }
+
+    const isValidAddressInTxOutputs = this.txOutputs.map(txOutput => Transaction.isValidAddress(txOutput.address)).reduce((a, b) => a && b, true);
+
+    if (!isValidAddressInTxOutputs) {
+      console.log('tx outputaddress is invalid in tx id: ', this.id);
       return false;
     }
 
@@ -243,6 +264,7 @@ class Transaction {
       return false;
     }
     if (this.txInputs.map(txInput => txInput.isValidTxInputStructure()).includes(false)) {
+      console.log('invalid inputs struct');
       return false;
     }
 
@@ -250,8 +272,9 @@ class Transaction {
       console.log('transaction output must be instance of array');
       return false;
     }
-    console.log(('c,mmmmm'));
+
     if (this.txOutputs.map(txOutput => txOutput.isValidTxOutputStructure()).includes(false)) {
+      console.log('invalid tx output struct');
       return false;
     }
     return true;
@@ -306,11 +329,27 @@ class Transaction {
       tx.id = rawTx.id;
       tx.txInputs = inputs;
       tx.txOutputs = outputs;
+      tx.sender = rawTx.sender;
+      tx.receiver = rawTx.receiver;
       txs.push(tx);
     }
 
     return txs;
   }
+
+  static isValidAddress = (address) => {
+    if (address.length !== 130) {
+      console.log('invalid public key length');
+      return false;
+    } else if (address.match('^[a-fA-F0-9]+$') === null) {
+      console.log('public key must contain only hex characters');
+      return false;
+    } else if (!address.startsWith('04')) {
+      console.log('public key must start with 04');
+      return false;
+    }
+    return true;
+  };
 
 }
 

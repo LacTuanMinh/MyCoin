@@ -28,6 +28,11 @@
   color: #61dafb;
 }
 
+.shadow {
+  box-shadow: 2px 4px 8px 2px rgba(0, 0, 0, 0.2), 4px 6px 20px 4px rgba(0, 0, 0, 0.19);
+  border: none;
+}
+
 @keyframes App-logo-spin {
   from {
     transform: rotate(0deg);
