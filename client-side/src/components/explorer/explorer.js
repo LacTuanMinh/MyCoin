@@ -11,6 +11,7 @@ import { CardHeader, IconButton, Paper, Table, TableBody, TableCell, TableContai
 import { API_URL } from '../../utils/constant';
 import moment from 'moment';
 import { Refresh } from '@material-ui/icons';
+import { Autocomplete } from '@material-ui/lab';
 
 const useStyles = makeStyles((theme) => ({
   icon: {
@@ -158,16 +159,23 @@ export default function Explorer({ isLoggedIn, keyPair }) {
 
             <Grid container spacing={5} alignItems="center">
               <Grid item xs={12} md={9}>
-                <TextField
-                  variant="outlined"
-                  margin="dense"
-                  required
-                  fullWidth
-                  label="Search by block hash or transaction id"
-                  size='small'
-                  onChange={e => handleInputChange(e.target.value)}
-                  value={input}
+                <Autocomplete
+                  freeSolo
+                  options={txs.map(tx => 'Txn id: ' + tx.id).concat(blocks.map(block => 'Block index: ' + block.index)).concat(blocks.map(block => 'Block hash: ' + block.hash))}
+                  renderInput={(params) => <TextField
+                    {...params}
+                    variant="outlined"
+                    margin="dense"
+                    required
+                    fullWidth
+                    label="Search by block hash or transaction id"
+                    size='small'
+                  // onChange={e => handleInputChange(e.target.value)}
+                  // value={input}
+                  />}
                 />
+
+
               </Grid>
               <Grid item xs={12} md={3}>
                 <Button

@@ -136,6 +136,16 @@ export default function Home({ isLoggedIn }) {
           ))}
         </Grid>
       </Container>
+      <CssBaseline />
+      <Container maxWidth="sm" component="main" className={classes.heroContent}>
+        <Typography component="h1" variant="h2" align="center" color="textPrimary" gutterBottom>
+          MyCoin Explorer
+        </Typography>
+        <Typography variant="h6" align="center" color="textSecondary" component="p">
+          A Block Explorer and Analytics Platform for MyCoin
+         </Typography>
+        <Button style={{ marginTop: '15px' }} onClick={() => { history.push('/explorer') }} variant="contained" color='primary'>To explorer</Button>
+      </Container>
     </React.Fragment >
   );
 }
