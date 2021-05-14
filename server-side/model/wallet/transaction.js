@@ -166,12 +166,12 @@ class Transaction {
     txInput.txOutputId = '';
     txInput.txOutputIndex = 0;
 
-    const txOutput = new TxOutput('04bbea97da0ba5a91b3afb6bc42fd11a0ca353219ef77683b2758b858766875abf099f2a86ef4a3c77f09be06b2ab6776a5b98c63e829235c4bb3c1812938969ce', MINING_REWARD);
+    const txOutput = new TxOutput('049036607fa5240cd0021e06cf8a3cab6837160a4c8bbf99b0d3a1e89f725db2f3379c944d35a1d483a8a1d77db7a291cd32b693a577486079ae508569d1b2d42e', MINING_REWARD);
     const tx = new Transaction();
     tx.txInputs = [txInput];
     tx.txOutputs = [txOutput];
     tx.sender = '';
-    tx.receiver = '04bbea97da0ba5a91b3afb6bc42fd11a0ca353219ef77683b2758b858766875abf099f2a86ef4a3c77f09be06b2ab6776a5b98c63e829235c4bb3c1812938969ce'
+    tx.receiver = '049036607fa5240cd0021e06cf8a3cab6837160a4c8bbf99b0d3a1e89f725db2f3379c944d35a1d483a8a1d77db7a291cd32b693a577486079ae508569d1b2d42e'
     tx.id = tx.getTxId();
     return tx;
   }

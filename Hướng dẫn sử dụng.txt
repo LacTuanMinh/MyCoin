@@ -1,0 +1,27 @@
+Run server: 
+	* Mở terminal đến thư mục server-side.
+	* Chạy lệnh sau để truuyền biến mội trường và chạy app: 
+		$env:KEY_LOCATION='key_storage/private_key.txt'; $env:PASSWORD='minhkhtn1234'; npm run dev;
+		(Nếu chạy một node khác thì mở termial khác và truyền thêm 2 biến PORT cho app và P2P_PORT cho web socket)
+	* (Miner sẽ được generate 1 keystore file chứa private_key được mã hóa chứa trong thư mục key_storage, miner cũng có thể sử dụng file này để
+		đăng nhập vào ví trên giao diện web bình thường)
+
+Run client:
+	* Mở termial đến thư mục client-side.
+	* Chạy lệnh: npm start
+
+Tạo ví và đăng nhập ví
+
+Demo gửi coin:
+
+	Giả sử miner có địa chỉ 049036607fa5240cd0021e06cf8a3cab6837160a4c8bbf99b0d3a1e89f725db2f3379c944d35a1d483a8a1d77db7a291cd32b693a577486079ae508569d1b2d42e)
+	là người đầu tiên được coinbase đầu tiên trong chain do đó sẽ có 50 coin bn đầu
+	 1. miner sẽ gửi tiền cho client bình thường bằng postman
+	 2. client gửi lại tiền cho người dùng (miner) này
+	 
+Miner đào coin bằng Proof of work
+	
+Xem thống kê tài khoản
+
+
+Xem lịch sử giao dịch (explorer)

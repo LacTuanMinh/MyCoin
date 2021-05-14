@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const fs = require('fs');
-// const Block = require('../model/block');
 const Blockchain = require('../model/block_chain');
 const { Transaction, UnspentTxOutput } = require('../model/wallet/transaction');
 const { TxPool } = require('../model/wallet/transaction_pool');
